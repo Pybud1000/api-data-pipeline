@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import requests
 
-products_path = r'C:\Users\PCXPC\Documents\super secret hehehe\Projects\api-data-extraction-pipeline\products.csv'
-reviews_path = r'C:\Users\PCXPC\Documents\super secret hehehe\Projects\api-data-extraction-pipeline\reviews.csv'
+products_path = r'C:\Users\PCXPC\Documents\super secret hehehe\Projects\api-data-pipeline\staging\products.csv'
+reviews_path = r'C:\Users\PCXPC\Documents\super secret hehehe\Projects\api-data-pipeline\staging\reviews.csv'
 
 try:
     url = "https://dummyjson.com/products"
@@ -16,50 +16,56 @@ try:
 
     while True:
         params = {
-            "skip" : skip,
-            "limit" : limit
+            "skip": skip,
+            "limit": limit
         }
+        print(f"Requesting skip={skip}, limit={limit}")
 
         response = requests.get(
             url,
-            params=params
+            params=params,
+            timeout=10
         )
 
+        print(f"Received skip={skip}")
         response.raise_for_status()
         data = response.json()
 
         product_page = data["products"]
         products.extend(product_page)
+        print(f"Products collected: {len(products)}/{data['total']}")
 
-        # Reviews Table
         s_reviews = pd.json_normalize(
-            data["products"],
+            product_page,
             record_path="reviews",
             meta=["id"]
         )
-        s_reviews = s_reviews.rename(columns={
-            "id" : "product_id"
-        })
-
+        s_reviews = s_reviews.rename(
+            columns={"id": "product_id"}
+        )
         reviews.append(s_reviews)
 
         total = data["total"]
-
         if len(products) >= total:
             break
         skip += limit
 
-    # Products Table
     products = pd.json_normalize(products)
-    products = products.drop(columns=["reviews"])
-
+    products = products.drop(
+        columns=["reviews"]
+    )
     reviews = pd.concat(
         reviews,
         ignore_index=True
     )
-
-    products.to_csv(products_path, index=False)
-    reviews.to_csv(reviews_path, index=False)
+    products.to_csv(
+        products_path,
+        index=False
+    )
+    reviews.to_csv(
+        reviews_path,
+        index=False
+    )
 
 except requests.exceptions.Timeout:
     print("request timed out")
